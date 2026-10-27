@@ -1,0 +1,181 @@
+# YouTube Automation
+
+A local Windows application that turns story text into narrated vertical videos
+with captions, then uploads them to channels you connect. There is no hosted
+backend, subscription, shared account, or API URL to configure.
+
+**Uploads request public visibility.** Video creation does not upload anything.
+Daily scheduling and startup uploading are both disabled initially.
+
+## Requirements
+
+- Windows 10 or 11, 64-bit.
+- Python 3.12 with the Windows Python launcher (`py`).
+- Node.js 20.9 or newer, including npm.
+- Internet for installing dependencies, downloading the voice model on first use,
+  Google sign-in, and uploading. Allow several GB for dependencies and models,
+  plus space for your media. CPU rendering is supported; speed varies by hardware.
+- Your own Google Cloud project and Desktop OAuth client credentials.
+- At least one background MP4 you have permission to use. None are included.
+
+## Install
+
+Download/extract this repository into a writable folder. Double-click `setup.cmd`.
+It creates two local Python environments, installs packages, prepares an
+unconnected main profile, and builds the dashboard. It does not connect accounts,
+create a Windows startup entry, or enable publishing automation.
+
+Manual installation, from PowerShell in the project folder:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+py -3.12 -m venv .venv-tts
+.\.venv-tts\Scripts\python.exe -m pip install -r requirements-tts.txt
+.\.venv\Scripts\python.exe initialize.py
+cd dashboard
+npm.cmd ci
+npm.cmd run build
+cd ..
+```
+
+The environments separate video/upload tools from the narration dependencies.
+Installation downloads third-party packages; Kokoro downloads its model on first
+generation. Dependencies and models retain their own licenses.
+
+## Connect your own YouTube channels
+
+1. Create your own Google Cloud project and enable **YouTube Data API v3**.
+2. Configure the Google OAuth consent screen. If the app is in Testing, add the
+   Google accounts you will authorize as test users in your own project.
+3. Create an OAuth client with application type **Desktop app**, download its JSON,
+   and save it as `credentials/client_secret.json`. An API key alone cannot upload.
+4. Double-click `start_dashboard.cmd`, keep its window running, and open
+   <http://127.0.0.1:3000>.
+5. Select the unconnected main profile and click **Connect channel**. Sign in and
+   choose the intended YouTube channel. The app requests upload and read access
+   and verifies the channel identity before uploading.
+6. Use **Add channel** for additional profiles and authorize each separately.
+   Profiles can use the shared OAuth client, or a client JSON inside that
+   profile's `channels/<id>/credentials/` folder.
+
+Official setup reference:
+[Google Desktop OAuth guide](https://developers.google.com/youtube/data/guides/auth/installed-apps).
+Google applies its own OAuth, quota, and account restrictions. The program
+requests public uploads; check actual visibility in YouTube Studio because
+account settings can affect the result. See the
+[upload API reference](https://developers.google.com/youtube/data/reference/rest/v3/videos/insert).
+
+## Create videos
+
+Add vertical background MP4s to `backgrounds/`, named `background_000.mp4`,
+`background_001.mp4`, etc. Supply clips long enough for the narration.
+
+Twenty of the shortest complete stories from the source collection are included
+in `stories/`. They retain their source URLs and may contain mature material.
+Their authors' rights are not transferred by inclusion here. Review content and
+obtain any permissions needed before reuse or publication.
+
+Select a channel, open **Settings**, choose voice, captions, word limits and
+backgrounds, then choose a count and click **Create videos**. The main profile uses
+`stories/`; additional profiles use `channels/<id>/stories/`. Move a story to the
+desired profile before generation. Shared duplicate checks prevent reusing it in
+another profile. Production runs one batch at a time.
+
+The generator selects unused complete stories, produces narration and timestamps,
+renders captions over a background, checks playback, and marks completed stories
+as used. Completed videos appear in the queue. Click **Upload next · Public** to
+publish one to the selected channel.
+
+Terminal alternatives:
+
+```powershell
+.\.venv-tts\Scripts\python.exe produce_batch.py --channel main --count 12
+.\.venv\Scripts\python.exe upload_next.py --channel main --dry-run
+.\.venv\Scripts\python.exe upload_next.py --channel main
+```
+
+The final command uploads publicly. If too few eligible stories exist or no
+backgrounds exist, generation stops with an explanation.
+
+### Collect more stories (optional)
+
+Install the separate scraper dependencies:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-scraper.txt
+.\.venv\Scripts\python.exe scraper.py
+```
+
+Chrome is required. The scraper opens Reddit, waits for you to press Enter in its
+terminal, and collects from `r/stories` into the main `stories/` folder. Reddit's
+layout or access restrictions can stop collection. Complete any browser access
+checks yourself. Respect the site's terms and the authors' rights.
+
+## Optional daily publishing
+
+For each channel, save daily times and a time zone in Settings and explicitly
+enable its public publishing schedule. Start `start_scheduler.cmd` and keep the
+computer awake, online, and the worker window running. It publishes at the
+configured times; it does not upload future scheduled videos in advance. Missed
+slots are not replayed. There is no automatic end date. Disable the schedule in
+Settings and close the worker to stop it. Keep a queue of finished videos.
+
+## Optional upload at Windows sign-in
+
+This uploads one ready video per connected profile each time Windows signs you
+in. It operates independently of the daily scheduler, so using both can publish
+additional videos. It never creates videos. First preview the destinations:
+
+```powershell
+.\.venv\Scripts\python.exe startup_upload.py --dry-run
+.\.venv\Scripts\python.exe startup_upload.py --enable
+```
+
+Then manually create a shortcut in your Windows Startup folder (`shell:startup`).
+Set its target to the **full path** to `.venv\Scripts\pythonw.exe`, followed by
+the quoted full path to `startup_upload.py`. Quote both paths if they contain spaces.
+Nothing is installed into Startup automatically. Keep the project in that location.
+
+The worker runs in the background, waits up to ten minutes for connectivity, and
+attempts each connected channel once. It saves results to
+`output/shared/startup_upload.log`. Repeated sign-ins can publish more videos.
+To disable, delete the shortcut and/or run:
+
+```powershell
+.\.venv\Scripts\python.exe startup_upload.py --disable
+```
+
+This prevents future runs, not an upload already in progress.
+
+## Privacy and troubleshooting
+
+Credentials, tokens, channel settings, logs, models, generated media and new
+stories stay on your computer and are excluded from Git. Never attach them to
+issues or commit them with force-add. Narration is generated locally; Google
+receives authorization requests and videos you choose to upload. The optional
+scraper contacts Reddit. The dashboard listens only on your computer.
+
+- **No videos available:** create a batch first; uploading does not generate one.
+- **No eligible stories:** check unused full text, title validity and word limits.
+- **Sign-in stopped working:** reconnect your profile; Google testing credentials
+  may require periodic reauthorization.
+- **Uncertain upload or stale lock:** check YouTube Studio and ensure no worker
+  is running before changing upload records or removing a lock. Do not repeatedly
+  retry a potentially successful upload.
+- **Antivirus alert:** inspect the detection. Do not broadly exclude PowerShell,
+  Python or the whole project. Startup installation is manual.
+- **Setup failed:** read the terminal error; verify Python 3.12, Node and internet.
+
+For problems, use this repository's GitHub Issues with a redacted error message,
+Windows/Python/Node versions and reproduction steps. Never include credentials.
+
+## Development checks
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests
+cd dashboard
+npm.cmd run build
+```
+
+No code license has been selected for this repository.
