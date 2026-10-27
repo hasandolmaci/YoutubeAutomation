@@ -48,6 +48,10 @@ It creates two local Python environments, installs packages, prepares an
 unconnected main profile, and builds the dashboard. It does not connect accounts,
 create a Windows startup entry, or enable publishing automation.
 
+If the Python launcher cannot find a custom Python 3.12 installation, pass its
+executable path: `setup.cmd "C:\Path\To\Python312\python.exe"` (in PowerShell,
+use `.\setup.cmd "C:\Path\To\Python312\python.exe"`).
+
 Manual installation, from PowerShell in the project folder:
 
 ```powershell

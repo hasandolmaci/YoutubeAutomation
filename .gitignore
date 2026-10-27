@@ -6,7 +6,7 @@
 .env
 .env.*
 !.env.example
-channels/
+/channels/
 output/
 videos/
 narrations/

@@ -13,6 +13,10 @@ import startup_upload
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_dashboard_channel_endpoint_is_distributed(self):
+        endpoint = channel_config.ROOT / 'dashboard/app/api/channels/route.js'
+        self.assertTrue(endpoint.is_file(), 'Channel controls require the channels API route.')
+
     def test_new_profile_has_no_connection_or_enabled_schedule(self):
         with tempfile.TemporaryDirectory(dir=channel_config.ROOT / 'output') as directory:
             root = Path(directory)

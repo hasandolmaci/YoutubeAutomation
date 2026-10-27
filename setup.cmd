@@ -1,15 +1,17 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-where py >nul 2>nul
+set "PYTHON312=py -3.12"
+if not "%~1"=="" set PYTHON312="%~1"
+%PYTHON312% -c "import sys; assert sys.version_info[:2] == (3, 12), 'Python 3.12 is required'"
 if errorlevel 1 goto failed
 where npm.cmd >nul 2>nul
 if errorlevel 1 goto failed
-py -3.12 -m venv .venv
+%PYTHON312% -m venv .venv
 if errorlevel 1 goto failed
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 if errorlevel 1 goto failed
-py -3.12 -m venv .venv-tts
+%PYTHON312% -m venv .venv-tts
 if errorlevel 1 goto failed
 .venv-tts\Scripts\python.exe -m pip install -r requirements-tts.txt
 if errorlevel 1 goto failed
@@ -28,5 +30,6 @@ exit /b 0
 popd
 :failed
 echo Setup stopped. Install Python 3.12 and Node.js 20.9 or newer; see README.md.
+echo For a custom Python installation: setup.cmd "C:\Path\To\Python312\python.exe"
 pause
 exit /b 1
