@@ -111,6 +111,11 @@ renders captions over a background, checks playback, and marks completed stories
 as used. Completed videos appear in the queue. Click **Upload next · Public** to
 publish one to the selected channel.
 
+## Viewer Bot
+The viewerspecific.py file includes a viewer bot that can increase the views on your videos. 
+However, I do not recommend using it as it violates YouTube's ToS.
+It is your own responsibility to decide whether to use it
+
 Terminal alternatives:
 
 ```powershell
