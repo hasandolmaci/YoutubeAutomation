@@ -1,5 +1,7 @@
 # YouTube Automation
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A local Windows application that turns story text into narrated vertical videos
 with captions, then uploads them to channels you connect. There is no hosted
 backend, subscription, shared account, or API URL to configure.
@@ -210,5 +212,11 @@ Windows/Python/Node versions and reproduction steps. Never include credentials.
 cd dashboard
 npm.cmd run build
 ```
+
+## License
+
+The project's original code is licensed under the [MIT License](LICENSE).
+Third-party dependencies, models, story text and media retain their respective
+licenses and permissions.
 
 
