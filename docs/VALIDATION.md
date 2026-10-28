@@ -1,5 +1,26 @@
 # Windows installation and production validation
 
+## Browser-upload option (28 October 2026)
+
+The optional browser backend has 19 offline safety tests. The complete
+suite passes 44 tests, and the dashboard production build succeeds. Tests cover
+Windows DPAPI encryption/decryption, reuse of saved state, missing/corrupt/expired
+sessions, wrong-channel rejection, browser upload history, interrupted uploads,
+and dry runs without browser activity. A local dashboard integration check also
+verifies method selection and that browser mode does not start API analytics.
+An isolated real-Chrome check saved a synthetic cookie through Playwright,
+encrypted it using Windows DPAPI, and restored it into a fresh browser context.
+That check did not contact Google or load any personal browser profile.
+
+The account owner completed manual Google sign-in and confirmed a successful
+headless upload: the dashboard reported success and the video appeared on the
+channel. The automated suite itself does not publish real videos. Browser UI
+selectors remain experimental and can change. The Upload, Insights and Library
+tabs were checked in desktop and mobile browser layouts. A fresh installation
+of this update has not yet been tested.
+
+## Original API-based release
+
 Validated on 27 October 2026 using an isolated clone of the public repository on
 an existing Windows laptop, with Python 3.12.15 and Node.js 22.14.0. This was not a
 fresh Windows virtual machine. The application environments were newly created;

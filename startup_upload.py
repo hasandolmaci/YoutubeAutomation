@@ -8,19 +8,18 @@ import sys
 import time
 from logging.handlers import RotatingFileHandler
 
-from channel_config import ROOT, SHARED, CHANNELS, load_channel, paths, read_json, write_json, lock
+from channel_config import ROOT, SHARED, CHANNELS, load_channel, paths, read_json, write_json, lock, channel_connected
 
 def channel_ids():
     return [file.parent.name for file in sorted(CHANNELS.glob('*/config.json'))
-            if load_channel(file.parent.name).get('youtube_channel_id')
-            and (paths(file.parent.name)['credentials'] / 'channel_token.json').exists()]
+            if channel_connected(file.parent.name)]
 
 
 def wait_for_network(timeout=600):
     deadline = time.monotonic() + timeout
     while True:
         try:
-            with socket.create_connection(('www.googleapis.com', 443), timeout=10):
+            with socket.create_connection(('www.youtube.com', 443), timeout=10):
                 return True
         except OSError:
             if time.monotonic() >= deadline:

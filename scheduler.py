@@ -7,7 +7,7 @@ import subprocess
 import time
 from datetime import datetime,timezone
 from zoneinfo import ZoneInfo
-from channel_config import ROOT,CHANNELS,SHARED,load_channel,paths,read_json,write_json,lock
+from channel_config import ROOT,CHANNELS,SHARED,load_channel,paths,read_json,write_json,lock,channel_connected
 
 def tick(dry_run=False, now=None):
     now=now or datetime.now(timezone.utc)
@@ -22,7 +22,7 @@ def tick(dry_run=False, now=None):
         if slot not in schedule['times'] or key in ledger:continue
         if dry_run:
             print(f"Due: {config['name']} at {slot} ({schedule['timezone']})",flush=True);continue
-        if not (paths(config['id'])['credentials']/'channel_token.json').exists():
+        if not channel_connected(config['id']):
             print(f"Not connected: {config['name']}",flush=True);continue
         if (SHARED/'upload.lock').exists():continue
         ledger[key]={'status':'started','started_at':now.isoformat()}

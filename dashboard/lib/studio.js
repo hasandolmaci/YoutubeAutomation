@@ -28,15 +28,31 @@ function start(script,args,state,tts=false){
   return child;
 }
 export async function syncInsights(connect=false,id='main'){
-  await config(id);if(connect)return connectChannel(id);
+  const selected=await config(id);
+  if(selected.upload_method==='browser')throw Error('Browser upload does not include API analytics. Select YouTube API to connect insights.');
+  if(connect)return connectChannel(id);
   if(!job(id).insights.running)start('youtube_insights.py',['--channel',id],job(id).insights);
 }
-export async function connectChannel(id){
-  await config(id);
-  const child=start('manage_channel.py',['connect',id],job(id).connection);
+export async function connectChannel(id,reconnect=false){
+  const selected=await config(id),method=selected.upload_method??'api';
+  const args=['connect',id,'--method',method];if(reconnect&&method==='browser')args.push('--reconnect');
+  const child=start('manage_channel.py',args,job(id).connection);
+  child.browserLogin=method==='browser';
   connectionProcesses.set(id,child);
   child.once('close',()=>{if(connectionProcesses.get(id)===child)connectionProcesses.delete(id);});
   return {started:true};
+}
+export async function setUploadMethod(id,method){
+  if(!['api','browser'].includes(method))throw Error('Choose a valid upload method.');
+  if(job(id).connection.running||job(id).upload.running)throw Error('Wait for the current connection or upload to finish.');
+  const selected=await config(id);selected.upload_method=method;
+  const file=path.join(root,'channels',id,'config.json');await fs.writeFile(file+'.tmp',JSON.stringify(selected,null,2));await fs.rename(file+'.tmp',file);
+  return {saved:true};
+}
+export async function disconnectBrowser(id){
+  await config(id);
+  if(job(id).connection.running||job(id).upload.running)throw Error('Wait for the current connection or upload to finish.');
+  start('manage_channel.py',['disconnect-browser',id],job(id).connection);return {started:true};
 }
 export async function cancelConnection(id){
   await config(id);
@@ -44,7 +60,11 @@ export async function cancelConnection(id){
   if(child&&child.exitCode===null){
     await new Promise((resolve,reject)=>{
       child.once('close',resolve);
-      if(!child.kill()){reject(Error('Could not stop the sign-in process. Please restart the dashboard.'));}
+      if(child.browserLogin&&process.platform==='win32'){
+        const stop=spawn('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true});
+        stop.once('error',()=>reject(Error('Could not close the sign-in browser. Close it manually.')));
+        stop.once('close',code=>{if(code!==0&&child.exitCode===null)reject(Error('Could not close the sign-in browser. Close it manually.'));});
+      }else if(!child.kill()){reject(Error('Could not stop the sign-in process. Please restart the dashboard.'));}
     });
   }
   connectionProcesses.delete(id);
@@ -53,8 +73,15 @@ export async function cancelConnection(id){
 }
 export async function snapshot(id='main'){
   const selected=await config(id),directory=base(id),state=job(id),credentials=path.join(directory,'credentials');
-  const connected=await fs.access(path.join(credentials,'channel_token.json')).then(()=>true,()=>false);
-  const insightsConnected=connected||await fs.access(path.join(credentials,'insights_token.json')).then(()=>true,()=>false);
+  const apiConnected=await fs.access(path.join(credentials,'channel_token.json')).then(()=>true,()=>false);
+  const browserConnected=await fs.access(path.join(credentials,'youtube_browser_auth.json')).then(()=>true,()=>false);
+  const connected=selected.upload_method==='browser'?browserConnected&&!!selected.youtube_channel_id:apiConnected;
+  const connection={...state.connection};
+  if(selected.upload_method==='browser'&&!connection.running&&!connection.error){
+    const savedConnection=await json(path.join(credentials,'browser_connection_status.json'),null);
+    if(savedConnection?.status==='failed')connection.error=savedConnection.error;
+  }
+  const insightsConnected=selected.upload_method!=='browser'&&(apiConnected||await fs.access(path.join(credentials,'insights_token.json')).then(()=>true,()=>false));
   const cache=await json(path.join(directory,'output/youtube_insights.json'),{updatedAt:null,videos:{}});
   if(insightsConnected&&Date.now()-state.insights.lastAttempt>300000)await syncInsights(false,id);
   const history=await json(path.join(credentials,'upload_history.json'),{}),records=Object.values(history),queue=[];
@@ -84,11 +111,11 @@ export async function snapshot(id='main'){
   }
   const backgroundFiles=(await files(path.join(root,'backgrounds'))).filter(f=>f.isFile()&&f.name.endsWith('.mp4')).map(f=>f.name),profiles=[];
   for(const folder of (await files(path.join(root,'channels'))).filter(f=>f.isDirectory())){const c=await json(path.join(root,'channels',folder.name,'config.json'),null);if(c)profiles.push({id:c.id,name:c.name,youtube_channel_id:c.youtube_channel_id});}
-  return {channel:{...selected,connected},channels:profiles,backgroundFiles,eligibleStories:eligible,
+  return {channel:{...selected,connected,browserConnected},channels:profiles,backgroundFiles,eligibleStories:eligible,
     stats:{stories,backgrounds:backgroundFiles.length,total:queue.length,ready:queue.filter(v=>v.status==='ready').length,uploaded:queue.filter(v=>v.status==='uploaded').length},
     queue,next:queue.find(v=>v.status==='ready'||v.status==='attention')??null,
     insights:{...state.insights,connected:insightsConnected,updatedAt:cache.updatedAt,totals:queue.reduce((t,v)=>({views:t.views+(v.insights?.viewCount??0),likes:t.likes+(v.insights?.likeCount??0),comments:t.comments+(v.insights?.commentCount??0)}),{views:0,likes:0,comments:0})},
-    upload:{...state.upload,log:[...state.upload.log]},connection:state.connection,production:{...production,log:[...production.log]},updatedAt:new Date().toISOString()};
+    upload:{...state.upload,log:[...state.upload.log]},connection,production:{...production,log:[...production.log]},updatedAt:new Date().toISOString()};
 }
 export async function uploadNext(id='main'){
   const data=await snapshot(id);

@@ -77,7 +77,7 @@ class ChannelTests(unittest.TestCase):
         finally:
             for p in reversed(common):p.stop()
     def test_scheduler_due_slot_once(self):
-        c=channels.load_channel('second');c['schedule'].update(enabled=True,timezone='Europe/Berlin',times=['10:00']);channels.write_json(channels.CHANNELS/'second/config.json',c)
+        c=channels.load_channel('second');c['youtube_channel_id']='expected-channel';c['schedule'].update(enabled=True,timezone='Europe/Berlin',times=['10:00']);channels.write_json(channels.CHANNELS/'second/config.json',c)
         (channels.paths('second')['credentials']/'channel_token.json').write_text('{}')
         now=datetime(2026,10,22,8,0,tzinfo=timezone.utc)
         with patch.object(scheduler,'CHANNELS',channels.CHANNELS),patch.object(scheduler,'SHARED',channels.SHARED),patch.object(scheduler.subprocess,'run',return_value=SimpleNamespace(returncode=0)) as run:

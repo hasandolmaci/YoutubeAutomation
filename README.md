@@ -40,7 +40,9 @@ duplicate-upload protection
 - Internet for installing dependencies, downloading the voice model on first use,
   Google sign-in, and uploading. Allow several GB for dependencies and models,
   plus space for your media. CPU rendering is supported; speed varies by hardware.
-- Your own Google Cloud project and Desktop OAuth client credentials.
+- For API uploads: your own Google Cloud project and Desktop OAuth client
+  credentials. Browser uploads instead require Google Chrome and the optional
+  browser dependencies below.
 - At least one background MP4 you have permission to use. None are included.
 
 ## Install
@@ -72,7 +74,16 @@ The environments separate video/upload tools from the narration dependencies.
 Installation downloads third-party packages; Kokoro downloads its model on first
 generation. Dependencies and models retain their own licenses.
 
-## Connect your own YouTube channels !!IMPORTANT
+## Connect your own YouTube channels !!! IMPORTANT
+
+You can use either **YouTube API** or **Browser · no API credentials** as the
+upload method for each profile. Existing profiles keep the API method until you
+change it. Choose one of the two methods below.
+
+### Method 1: YouTube API
+
+This method uses Google's official YouTube API. It requires a Google Cloud
+project and your own OAuth credentials. Follow these steps:
 
 1. Create your own Google Cloud project and enable **YouTube Data API v3**.
 2. Configure the Google OAuth consent screen. If the app is in Testing, add the
@@ -94,6 +105,82 @@ Google applies its own OAuth, quota, and account restrictions. The program
 requests public uploads; check actual visibility in YouTube Studio because
 account settings can affect the result. See the
 [upload API reference](https://developers.google.com/youtube/data/reference/rest/v3/videos/insert).
+
+### Method 2: No API — easier setup (still in testing)
+
+This method uploads through YouTube Studio using your saved browser session.
+You do not need a Google Cloud project, API key or OAuth client: install the
+browser dependencies, sign in once, and the app handles subsequent uploads.
+
+**This method is still being tested, so you may encounter errors.** I would
+appreciate it if you report any problems through
+[GitHub Issues](https://github.com/hasandolmaci/YoutubeAutomation/issues), including
+the error message and steps to reproduce it. Please remove personal information
+and never share cookies, saved sessions or credentials.
+
+Install Google Chrome and the optional browser dependency:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-browser.txt
+```
+
+No additional Chromium download is required. In the dashboard, select a profile,
+choose **Browser · no API credentials**, and click **Connect channel**. Chrome
+opens YouTube Studio. Sign in yourself, complete any account checks, and choose
+the correct channel. The app detects the channel and saves the session
+automatically; you do not enter your Google password into the dashboard or press
+Enter in a terminal. Previously bound profiles must connect to their expected
+channel, and two profiles cannot bind the same destination.
+
+The state is saved as `credentials/youtube_browser_auth.json` for the main
+profile, or `channels/<id>/credentials/youtube_browser_auth.json` for another
+profile. This file contains a Windows DPAPI-encrypted payload, rather than
+plaintext cookies, and is excluded from Git. It can be decrypted by processes
+running as your Windows account; it is not protection against malware running
+as you. Do not share the file or include credentials in issue reports.
+
+**Upload next · Public** uses the chosen method. Browser uploads run Chrome headlessly,
+reuse saved state, verify the active Studio channel and publish via the Studio
+interface. The existing upload history and interruption guards apply to both
+methods. Scheduled and startup publishing use the profile's selected method too;
+if browser sign-in expires, they stop and require you to reconnect interactively.
+The app cannot promise that Google will keep a session valid indefinitely.
+
+Only connecting or reconnecting opens a visible sign-in window. Upload progress
+appears in the dashboard's **Upload activity** log. After YouTube confirms the
+upload or accepts it for processing, the app verifies the video ID, waits five
+seconds, then closes the browser. Processing acceptance does not mean the video
+is publicly available yet; YouTube must finish processing it first.
+
+Use **Sign in again** to replace an unreadable session, or **Delete saved browser
+session** to remove local access state. Deleting the local file does not revoke
+sessions on Google's servers. API credentials are managed separately.
+
+Terminal alternatives:
+
+```powershell
+.\.venv\Scripts\python.exe manage_channel.py connect main --method browser
+.\.venv\Scripts\python.exe upload_next.py --channel main --method browser --dry-run
+.\.venv\Scripts\python.exe upload_next.py --channel main --method browser
+.\.venv\Scripts\python.exe manage_channel.py disconnect-browser main
+```
+
+The third command performs a real public upload. No API analytics are fetched in
+browser mode. The Studio uploader uses element identifiers rather than English
+button labels and is experimental: Google can reject automated-browser sign-in, require manual
+security checks, or change the upload interface. No CAPTCHA or security-check
+bypass is implemented. Use the API option if browser sign-in is unsupported.
+
+### Dashboard tabs
+
+- **Upload:** publish the next ready video and follow upload activity.
+- **Insights:** connect or refresh API-based channel analytics. Browser upload
+  sessions do not provide API analytics.
+- **Library:** browse the video queue, filter upload status, and view library counts.
+
+Channel selection, connection settings and video creation controls remain above
+the tabs. Switching tabs does not stop an upload. Use the local address printed
+by the dashboard launcher, including its port number.
 
 ## Create videos
 

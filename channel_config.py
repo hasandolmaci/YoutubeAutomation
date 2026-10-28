@@ -40,7 +40,7 @@ def create_channel(channel, name):
     config_path = CHANNELS / channel / 'config.json'
     if config_path.exists():
         raise ValueError('That channel ID already exists.')
-    config = {'id':channel, 'name':name.strip() or channel, 'youtube_channel_id':None,
+    config = {'id':channel, 'name':name.strip() or channel, 'youtube_channel_id':None, 'upload_method':'api',
               'youtube_channel_name':None, 'voice':'af_heart', 'speed':1.0,
               'period_pause':0.25, 'caption_style':'words', 'story_category':'General stories',
               'backgrounds':[], 'min_words':1, 'max_words':400,
@@ -52,6 +52,17 @@ def create_channel(channel, name):
 def story_fingerprint(text):
     normalized = ' '.join(unicodedata.normalize('NFKC',text).casefold().split())
     return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+
+def upload_method(config):
+    method = config.get('upload_method', 'api')
+    if method not in ('api', 'browser'):
+        raise ValueError('Upload method must be api or browser.')
+    return method
+
+def channel_connected(channel):
+    config = load_channel(channel)
+    name = 'youtube_browser_auth.json' if upload_method(config) == 'browser' else 'channel_token.json'
+    return bool(config.get('youtube_channel_id')) and (paths(channel)['credentials'] / name).exists()
 
 @contextlib.contextmanager
 def lock(name):

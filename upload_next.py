@@ -78,8 +78,12 @@ def authorize():
     return creds
 
 
-def run(folder, dry_run, channel='main'):
+def run(folder, dry_run, channel='main', method=None):
     config = load_channel(channel)
+    from channel_config import upload_method
+    method = method or upload_method(config)
+    if method not in ('api', 'browser'):
+        raise ValueError('Upload method must be api or browser.')
     ledger = paths(channel)['credentials'] / 'upload_history.json'
     history = json.loads(ledger.read_text(encoding='utf-8')) if ledger.exists() else {}
     selected = select_video(folder, history, dry_run)
@@ -103,8 +107,32 @@ def run(folder, dry_run, channel='main'):
         raise RuntimeError('This story is assigned to another channel. Nothing uploaded.')
     print(f"Channel: {config['name']} ({config.get('youtube_channel_id') or 'not connected'})", flush=True)
     print(f'Video: {path.name}\nTitle: {title}\nVisibility: PUBLIC', flush=True)
+    print(f'Upload method: {method}', flush=True)
     if dry_run:
         print(f'Dry run only. After a successful upload: {used.name}')
+        return
+    if method == 'browser':
+        from browser_upload import upload
+
+        def before_upload():
+            history[digest] = {'status':'uploading', 'file':str(path), 'title':title,
+                               'upload_method':'browser', 'youtube_channel_id':config.get('youtube_channel_id')}
+            shared[digest] = {**history[digest], 'channel':channel}
+            write_json(SHARED / 'video_uploads.json', shared)
+            write_json(ledger, history)
+
+        video_id, channel_id = upload(channel, path, title, before_upload)
+        history[digest].update(status='uploaded', video_id=video_id, youtube_channel_id=channel_id,
+                              privacy='public', renamed_file=str(used))
+        write_json(ledger, history)
+        shared[digest] = {**history[digest], 'channel':channel}
+        write_json(SHARED / 'video_uploads.json', shared)
+        print(f'Uploaded: https://www.youtube.com/watch?v={video_id}', flush=True)
+        try:
+            path.rename(used)
+        except OSError:
+            raise RuntimeError('Upload SUCCEEDED, but renaming failed. Upload history prevents duplicates.') from None
+        print(f'Renamed: {used.name}', flush=True)
         return
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaFileUpload
@@ -159,6 +187,7 @@ def main():
     parser.add_argument('--folder', type=Path)
     parser.add_argument('--channel', default='main')
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--method', choices=['api', 'browser'], help='Override this profile\'s upload method.')
     args = parser.parse_args()
     channel_paths=paths(args.channel)
     if args.folder is None:
@@ -180,7 +209,7 @@ def main():
             handle.write(str(os.getpid()))
             handle.flush()
             with __import__('channel_config').lock('upload'):
-                run(args.folder.resolve(), args.dry_run, args.channel)
+                run(args.folder.resolve(), args.dry_run, args.channel, args.method)
     finally:
         lock.unlink(missing_ok=True)
 
